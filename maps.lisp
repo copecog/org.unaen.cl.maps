@@ -6,7 +6,6 @@
   (:use #:common-lisp)
   (:export #:*map-test*
            #:map
-           #:map-new
            #:map-add
            #:map-get))
 
@@ -25,7 +24,7 @@
               :documentation "The number of input objects that are going to be mapped to the single output object."))
   (:documentation "My own dumb multi-dimensional map implementation."))
 
-(defun map-new (&key (dimension 1))
+(defun map (&key (dimension 1))
   (declare (type (integer 1 *) dimension))
   (make-instance 'map
                  :dimension dimension))
