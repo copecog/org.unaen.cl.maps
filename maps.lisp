@@ -41,7 +41,7 @@
 
 (defmethod map-add (to-object from-object (map-inst map))
   (map-add-2 to-object
-             (list from-object)
+             `(,from-object)
              map-inst))
 
 (defmethod map-add (to-object (from-objects cons) (map-inst map))
@@ -50,22 +50,26 @@
              map-inst))
 
 (defun map-add-2 (to-object from-objects map-inst)
+  "Recurse from-objects as hash table keys, setting or creating hash-tables for each dimension along the way."
   (labels ((map-add-rec (nth-dimension from-objects-remaining)
-             (let ((nth-elt (first from-objects-remaining))
+             (let ((nth-elt   (first  from-objects-remaining))
                    (nth+1-elt (second from-objects-remaining)))
-               (if nth+1-elt                                                    ;IF there is a next object in the list:
-                   (let ((nth+1-dimension (gethash nth-elt nth-dimension)))         ;THEN set in current hash-table for key object to reference the next key object hash table
-                     (if (null nth+1-dimension)                                         ;IF that next key object hash table doesn't exist:
-                         (map-add-rec (setf (gethash nth-elt nth-dimension)                 ;THEN make a hash-table for it and recurse starting at the next object in the list.
-                                            (make-hash-table :test *map-test*))
-                                      (rest from-objects-remaining))
-                         (map-add-rec nth+1-dimension                                       ;ELSE simply recurse with next key object and hash-table.
-                                      (rest from-objects-remaining))))
-                   (setf (gethash nth-elt nth-dimension)                            ;ELSE we are on the last key object and so finally set the output to-object.
+               (if nth+1-elt
+                   (let ((nth+1-dimension (gethash nth-elt
+						   nth-dimension)))
+                     (etypecase nth+1-dimension
+                       (hash-table (map-add-rec nth+1-dimension
+						(rest from-objects-remaining)))
+                       (null       (map-add-rec (setf (gethash nth-elt
+							       nth-dimension)
+						      (make-hash-table :test *map-test*))
+						(rest from-objects-remaining)))))
+                   (setf (gethash nth-elt
+				  nth-dimension)
                          to-object)))))
-    (values (map-add-rec (stor map-inst) from-objects)
-            from-objects
-            map-inst)))
+
+    (map-add-rec (stor map-inst)
+		 from-objects)))
 
 (defgeneric map-get (from-object/objects-list map-instance)
   (:documentation "Get the output object mapping for a respective object or objects list."))
@@ -86,13 +90,19 @@
              map-inst))
 
 (defun map-get-2 (from-objects map-inst)
+  "Recurse from-objects as hash table keys until reaching a non-nil to-object."
   (labels ((map-get-rec (nth-dimension from-objects-remaining)
-             (let* ((nth-elt (first from-objects-remaining))
-                    (nth+1-elt (second from-objects-remaining))
-                    (nth+1-dimension (gethash nth-elt nth-dimension)))
-               (if nth+1-elt
-                   (map-get-rec nth+1-dimension (rest from-objects-remaining))
-                   nth+1-dimension))))
-    (values (map-get-rec (stor map-inst) from-objects)
-            from-objects
-            map-inst)))
+	     (let* ((nth-elt         (first   from-objects-remaining))
+		    (nth+1-elt       (second  from-objects-remaining))
+		    (nth+1-dimension (gethash nth-elt
+					      nth-dimension)))
+	       (if nth+1-elt
+		   (etypecase nth+1-dimension
+		     (hash-table (map-get-rec nth+1-dimension
+					      (rest from-objects-remaining)))
+		     (null 'nil))
+		   nth+1-dimension))))
+
+    (map-get-rec (stor map-inst)
+		 from-objects)))
+
