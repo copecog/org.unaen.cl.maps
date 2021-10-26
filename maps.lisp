@@ -34,42 +34,41 @@
 
 (defmethod map-add :before (to-object from-object/s (map-inst map))
   (when (/= (typecase from-object/s
-              (cons (list-length from-object/s))
-              (atom 1))
+	      (cons (list-length from-object/s))
+	      (atom 1))
             (dimension map-inst))
     (error "Incorrect number of from-objects.")))
 
-(defmethod map-add (to-object from-object (map-inst map))
-  (map-add-2 to-object
-             `(,from-object)
-             map-inst))
+(labels ((map-add-rec (to-object from-objects-remaining nth-dimension)
+	   "Recurse from-objects as hash table keys, setting or creating hash-tables for each dimension along the way."
+	   (let ((nth-elt   (first  from-objects-remaining))
+		 (nth+1-elt (second from-objects-remaining)))
+	     (if nth+1-elt
+		 (let ((nth+1-dimension (gethash nth-elt
+						 nth-dimension)))
+		   (etypecase nth+1-dimension
+		     (hash-table (map-add-rec to-object
+					      (rest from-objects-remaining)
+					      nth+1-dimension))
+		     (null       (map-add-rec to-object
+					      (rest from-objects-remaining)
+					      (setf (gethash nth-elt
+							     nth-dimension)
+						    (make-hash-table :test *map-test*))))))
+		 (setf (gethash nth-elt
+				nth-dimension)
+		       to-object)))))
 
-(defmethod map-add (to-object (from-objects cons) (map-inst map))
-  (map-add-2 to-object
-             from-objects
-             map-inst))
+  (defmethod map-add (to-object from-object (map-inst map))
+    (map-add-rec to-object
+		 `(,from-object)
+		 (stor map-inst)))
 
-(defun map-add-2 (to-object from-objects map-inst)
-  "Recurse from-objects as hash table keys, setting or creating hash-tables for each dimension along the way."
-  (labels ((map-add-rec (nth-dimension from-objects-remaining)
-             (let ((nth-elt   (first  from-objects-remaining))
-                   (nth+1-elt (second from-objects-remaining)))
-               (if nth+1-elt
-                   (let ((nth+1-dimension (gethash nth-elt
-						   nth-dimension)))
-                     (etypecase nth+1-dimension
-                       (hash-table (map-add-rec nth+1-dimension
-						(rest from-objects-remaining)))
-                       (null       (map-add-rec (setf (gethash nth-elt
-							       nth-dimension)
-						      (make-hash-table :test *map-test*))
-						(rest from-objects-remaining)))))
-                   (setf (gethash nth-elt
-				  nth-dimension)
-                         to-object)))))
+  (defmethod map-add (to-object (from-objects cons) (map-inst map))
+    (map-add-rec to-object
+		 from-objects
+		 (stor map-inst))))
 
-    (map-add-rec (stor map-inst)
-		 from-objects)))
 
 (defgeneric map-get (from-object/objects-list map-instance)
   (:documentation "Get the output object mapping for a respective object or objects list."))
@@ -81,28 +80,24 @@
             (dimension map-inst))
     (error "Incorrect number of from-objects.")))
 
-(defmethod map-get (from-object (map-inst map))
-  (map-get-2 (list from-object)
-             map-inst))
+(labels ((map-get-rec (from-objects-remaining nth-dimension)
+	   "Recurse from-objects as hash table keys until reaching a non-nil to-object."
+	   (let* ((nth-elt         (first   from-objects-remaining))
+		  (nth+1-elt       (second  from-objects-remaining))
+		  (nth+1-dimension (gethash nth-elt
+					    nth-dimension)))
+	     (if nth+1-elt
+		 (etypecase nth+1-dimension
+		   (hash-table (map-get-rec (rest from-objects-remaining)
+					    nth+1-dimension))
+		   (null       'nil))
+		 nth+1-dimension))))
 
-(defmethod map-get ((from-objects cons) (map-inst map))
-  (map-get-2 from-objects
-             map-inst))
+  (defmethod map-get (from-object (map-inst map))
+    (map-get-rec (list from-object)
+		 (stor map-inst)))
 
-(defun map-get-2 (from-objects map-inst)
-  "Recurse from-objects as hash table keys until reaching a non-nil to-object."
-  (labels ((map-get-rec (nth-dimension from-objects-remaining)
-	     (let* ((nth-elt         (first   from-objects-remaining))
-		    (nth+1-elt       (second  from-objects-remaining))
-		    (nth+1-dimension (gethash nth-elt
-					      nth-dimension)))
-	       (if nth+1-elt
-		   (etypecase nth+1-dimension
-		     (hash-table (map-get-rec nth+1-dimension
-					      (rest from-objects-remaining)))
-		     (null 'nil))
-		   nth+1-dimension))))
-
-    (map-get-rec (stor map-inst)
-		 from-objects)))
+  (defmethod map-get ((from-objects cons) (map-inst map))
+    (map-get-rec from-objects
+		 (stor map-inst))))
 
