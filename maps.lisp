@@ -6,6 +6,7 @@
   (:use #:common-lisp)
   (:export #:*map-test*
            #:map
+	   #:mapp
            #:map-add
            #:map-get))
 
@@ -24,6 +25,12 @@
               :documentation "The number of input objects that are going to be mapped to the single output object."))
   (:documentation "My own dumb multi-dimensional map implementation."))
 
+(defgeneric mapp (object)
+  (:method ((map map))
+    t)
+  (:method (object)
+    nil))
+
 (defun map (&key (dimension 1))
   (declare (type (integer 1 *) dimension))
   (make-instance 'map
@@ -41,7 +48,7 @@
 
 (labels ((map-add-rec (to-object from-objects-remaining nth-dimension)
 	   "Recurse from-objects as hash table keys, setting or creating hash-tables for each dimension along the way."
-	   (let ((nth-elt   (first  from-objects-remaining))
+	   (let ((nth-elt (first from-objects-remaining))
 		 (nth+1-elt (second from-objects-remaining)))
 	     (if nth+1-elt
 		 (let ((nth+1-dimension (gethash nth-elt
@@ -50,11 +57,11 @@
 		     (hash-table (map-add-rec to-object
 					      (rest from-objects-remaining)
 					      nth+1-dimension))
-		     (null       (map-add-rec to-object
-					      (rest from-objects-remaining)
-					      (setf (gethash nth-elt
-							     nth-dimension)
-						    (make-hash-table :test *map-test*))))))
+		     (null (map-add-rec to-object
+					(rest from-objects-remaining)
+					(setf (gethash nth-elt
+						       nth-dimension)
+					      (make-hash-table :test *map-test*))))))
 		 (setf (gethash nth-elt
 				nth-dimension)
 		       to-object)))))
@@ -82,15 +89,15 @@
 
 (labels ((map-get-rec (from-objects-remaining nth-dimension)
 	   "Recurse from-objects as hash table keys until reaching a non-nil to-object."
-	   (let* ((nth-elt         (first   from-objects-remaining))
-		  (nth+1-elt       (second  from-objects-remaining))
+	   (let* ((nth-elt (first from-objects-remaining))
+		  (nth+1-elt (second from-objects-remaining))
 		  (nth+1-dimension (gethash nth-elt
 					    nth-dimension)))
 	     (if nth+1-elt
 		 (etypecase nth+1-dimension
 		   (hash-table (map-get-rec (rest from-objects-remaining)
 					    nth+1-dimension))
-		   (null       'nil))
+		   (null 'nil))
 		 nth+1-dimension))))
 
   (defmethod map-get (from-object (map-inst map))
