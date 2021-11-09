@@ -108,3 +108,33 @@
     (map-get-rec from-objects
 		 (stor map-inst))))
 
+(defmethod map-find-element (element (map map) &key test)
+  "Given an object and map stor and dimension with keyword test function, find and return first object for which (test element object) is true."  
+  (unless test
+    (setf test #'equal))
+  (with-slots ((stor stor) (dimension dimension)) map
+    (catch 'found (map-find-element-rec element stor dimension test))))
+
+(defun map-find-element-rec (element stor dimension test)
+  (declare (type hash-table stor)
+	   (type (integer 0 *) dimension)
+	   (type function test))
+  (cond ((>= dimension 2) (loop :for object :being :the :hash-values :of stor
+				:do (map-find-element-rec element object (1- dimension) test)))
+	((=  dimension 1) (loop :for object :being :the :hash-values :of stor
+				:do (when (funcall test element object) (throw 'found object))))))
+				      
+(defun %map-find-element (element stor dimension test)
+  (declare (type hash-table stor)
+	   (type (integer 0 *) dimension)
+	   (type function test))
+  (labels ((test-or-recursion ()
+	     (cond ((>= dimension 2) #'(lambda (object); object passed will be next dimension hash-table
+					 (%map-find-element element object (1- dimension) test)))
+		   ((=  dimension 1) #'(lambda (object)
+					 (when (funcall test element object)
+					   (throw 'found object))))))
+	   (loop-current-dimension (test)
+	     (loop :for object :being :the :hash-values :of stor
+		   :do (funcall test object))))
+    (loop-current-dimension (test-or-recursion))))
