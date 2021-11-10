@@ -113,42 +113,13 @@
   (unless test
     (setf test #'equal))
   (with-slots ((stor stor) (dimension dimension)) map
-    (hash-table-find-object element stor :depth dimension :test test)))
+    (catch 'found (%map-find-element element stor dimension test))))
 
-(defun map-find-element-rec (element stor dimension test)
-  (declare (type hash-table stor) (type (integer 0 *) dimension) (type function test))
-  (cond ((>= dimension 2) (loop :for object :being :the :hash-values :of stor
-				:do (map-find-element-rec element object (1- dimension) test)))
-	((=  dimension 1) (loop :for object :being :the :hash-values :of stor
-				:do (when (funcall test element object) (throw 'found object))))))
-				      
 (defun %map-find-element (element stor dimension test)
   (declare (type hash-table stor) (type (integer 0 *) dimension) (type function test))
-  (labels ((test-or-recursion ()
-	     (cond ((>= dimension 2) #'(lambda (object)
-					 (%map-find-element element object (1- dimension) test)))
-		   ((=  dimension 1) #'(lambda (object)
-					 (when (funcall test element object) (throw 'found object))))))
-	   (loop-current-dimension (test)
-	     (loop :for object :being :the :hash-values :of stor
-		   :do (funcall test object))))
-    (loop-current-dimension (test-or-recursion))))
+  (cond ((>= dimension 2) (loop :for object :being :the :hash-values :of stor
+				:do (%map-find-element element object (1- dimension) test)))
+	((=  dimension 1) (loop :for object :being :the :hash-values :of stor
+				:do (when (funcall test element object) (throw 'found object))))))
 
-(defun hash-table-find-object (object hash-table &key (depth 1) (test #'equal))
-  "Find first object under recursive linked hash-tables and return."
-  (declare (type hash-table hash-table) (type (integer 0 *) depth) (type function test))
-  (catch 'found (%hash-table-find-object object hash-table depth test)))
 
-(defun %hash-table-find-object (object hash-table depth test)
-  (declare (type hash-table hash-table) (type (integer 0 *) depth) (type function test))
-  (labels ((test-or-recursion ()
-	     (cond ((>= depth 2) #'(lambda (hash-value)
-				     (%hash-table-find-object object hash-value (1- depth) test)))
-		   ((=  depth 1) #'(lambda (hash-value)
-				     (when (funcall test object hash-value) (throw 'found hash-value))))))
-	   (loop-current-depth (test)
-	     (loop :for hash-value :being :the :hash-values :of hash-table
-		   :do (funcall test hash-value))))
-    (loop-current-depth (test-or-recursion))))
-  
-  
