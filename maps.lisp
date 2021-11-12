@@ -6,9 +6,11 @@
   (:use #:common-lisp)
   (:export #:*map-test*
            #:map
+	   #:dimension
 	   #:mapp
            #:map-add
-           #:map-get))
+           #:map-get
+	   #:map-find-element))
 
 (in-package #:org.unaen.cl.maps)
 
@@ -109,17 +111,25 @@
 		 (stor map-inst))))
 
 (defmethod map-find-element (element (map map) &key test)
-  "Given an object and map stor and dimension with keyword test function, find and return first object for which (test element object) is true."
+  "Given an object and map stor and dimension with keyword test function, find and return first object for which (test element object) is true as well as the list of input dimension objects that map to the object."
   (unless test
     (setf test #'equal))
   (with-slots ((stor stor) (dimension dimension)) map
-    (catch 'found (%map-find-element element stor dimension test))))
+    (%map-find-element element stor dimension test)))
 
 (defun %map-find-element (element stor dimension test)
   (declare (type hash-table stor) (type (integer 0 *) dimension) (type function test))
-  (cond ((>= dimension 2) (loop :for object :being :the :hash-values :of stor
-				:do (%map-find-element element object (1- dimension) test)))
-	((=  dimension 1) (loop :for object :being :the :hash-values :of stor
-				:do (when (funcall test element object) (throw 'found object))))))
+  (cond ((>= dimension 2) (loop :for object :being :the :hash-values :of stor :using (:hash-key object-in)
+				:do (multiple-value-bind (object-found object-in-list)
+					(%map-find-element element object (1- dimension) test)
+				      (when object-found
+					(return-from %map-find-element
+					  (values object-found
+						  (cons object-in object-in-list)))))))
+	((=  dimension 1) (loop :for object :being :the :hash-values :of stor :using (:hash-key object-in)
+				:do (when (funcall test element object)
+				      (return-from %map-find-element
+					(values object
+						(list object-in))))))))
 
 
